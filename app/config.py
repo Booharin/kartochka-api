@@ -6,6 +6,9 @@ class Settings(BaseSettings):
     supabase_service_key: str
     app_env: str = "development"
     secret_key: str
+    fal_key: str
+    openai_api_key: str
+    google_api_key: str = ""
 
     class Config:
         env_file = ".env"
