@@ -120,8 +120,6 @@ async def create_card(
             image_url=input_url,
             benefits=benefits,
             aspect_ratio=aspect_ratio,
-            user_id=user_id,
-            admin=admin,
         )
 
         # Сохранить в историю генераций

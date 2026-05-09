@@ -1,7 +1,5 @@
-import base64
 import httpx
 import io
-import uuid
 from PIL import Image
 from openai import AsyncOpenAI
 from app.config import settings
@@ -13,8 +11,6 @@ async def generate_card(
     image_url: str,
     benefits: list[str],
     aspect_ratio: str = "3:4",
-    user_id: str = None,
-    admin=None,
 ) -> str:
 
     # Скачиваем фото товара
@@ -56,18 +52,6 @@ Keep the product from the image and add:
     )
 
     image_data = response.data[0].b64_json
-    result_bytes = base64.b64decode(image_data)
 
-    # Загружаем результат в Supabase Storage
-    if admin and user_id:
-        result_path = f"{user_id}/cards/{uuid.uuid4()}.png"
-        admin.storage.from_("results").upload(
-            path=result_path,
-            file=result_bytes,
-            file_options={"content-type": "image/png"}
-        )
-        result_url = admin.storage.from_("results").get_public_url(result_path)
-        return result_url
-
-    # Fallback — вернуть base64
+    # Всегда возвращаем base64 — сохранение в Storage делает generations.py
     return f"data:image/png;base64,{image_data}"

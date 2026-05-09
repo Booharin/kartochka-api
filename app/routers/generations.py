@@ -1,10 +1,15 @@
 from fastapi import APIRouter, HTTPException, Header, UploadFile, File, Form
+from fastapi.responses import Response
 from typing import Optional
 from app.database import get_supabase, get_supabase_admin
 from app.services.generation import generate_product_shot, get_prompt_preview
 import uuid
+import httpx
+import base64 as b64lib
 
 router = APIRouter(prefix="/generations", tags=["generations"])
+
+API_BASE = "https://api.kartochka.top"
 
 
 def get_user_id(token: str) -> str:
@@ -14,6 +19,31 @@ def get_user_id(token: str) -> str:
         return response.user.id
     except:
         raise HTTPException(status_code=401, detail="Токен недействителен")
+
+
+async def save_result(
+    result_b64_or_url: str,
+    user_id: str,
+    generation_id: str,
+    admin,
+) -> str:
+    """Скачивает или декодирует результат, сохраняет в Supabase, возвращает прокси-URL."""
+    if result_b64_or_url.startswith("data:image"):
+        img_bytes = b64lib.b64decode(result_b64_or_url.split(",")[1])
+    else:
+        async with httpx.AsyncClient(timeout=60) as http:
+            resp = await http.get(result_b64_or_url)
+            resp.raise_for_status()
+            img_bytes = resp.content
+
+    result_path = f"{user_id}/photos/{generation_id}.png"
+    admin.storage.from_("results").upload(
+        path=result_path,
+        file=img_bytes,
+        file_options={"content-type": "image/png"}
+    )
+
+    return f"{API_BASE}/files/results/{result_path}"
 
 
 @router.post("/")
@@ -40,7 +70,7 @@ async def create_generation(
     if not sub.data or sub.data["credits_left"] <= 0:
         raise HTTPException(status_code=402, detail="Недостаточно кредитов")
 
-    # 2. Загрузить фото
+    # 2. Загрузить входное фото
     file_content = await file.read()
     file_ext = file.filename.split(".")[-1]
     file_path = f"{user_id}/{uuid.uuid4()}.{file_ext}"
@@ -76,20 +106,8 @@ async def create_generation(
             category=category,
         )
 
-        # Если вернулся base64 — загружаем в Storage
-        if result_b64_or_url.startswith("data:image"):
-            import base64 as b64lib
-            img_data = result_b64_or_url.split(",")[1]
-            img_bytes = b64lib.b64decode(img_data)
-            result_path = f"{user_id}/photos/{generation_id}.png"
-            admin.storage.from_("results").upload(
-                path=result_path,
-                file=img_bytes,
-                file_options={"content-type": "image/png"}
-            )
-            result_url = admin.storage.from_("results").get_public_url(result_path)
-        else:
-            result_url = result_b64_or_url
+        # Всегда сохраняем файл и возвращаем прокси-URL
+        result_url = await save_result(result_b64_or_url, user_id, generation_id, admin)
 
         admin.table("generations").update({
             "status": "done",
@@ -137,5 +155,4 @@ async def prompt_preview(
     concept: str,
     prompt: Optional[str] = None,
 ):
-    """Возвращает промпт который будет отправлен модели"""
     return {"prompt": get_prompt_preview(model, concept, prompt)}
