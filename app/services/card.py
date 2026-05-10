@@ -6,6 +6,14 @@ from app.config import settings
 
 client = AsyncOpenAI(api_key=settings.openai_api_key)
 
+ASPECT_RATIO_MAP = {
+    "9:16": "1024x1792",
+    "3:4":  "1024x1792",
+    "1:1":  "1024x1024",
+    "4:3":  "1792x1024",
+    "16:9": "1792x1024",
+}
+
 
 async def generate_card(
     image_url: str,
@@ -28,12 +36,39 @@ async def generate_card(
     square.save(png_buffer, format="PNG")
     png_bytes = png_buffer.getvalue()
 
+    size_param = ASPECT_RATIO_MAP.get(aspect_ratio, "1024x1792")
+
     benefits_text = "\n".join([f"— {b}" for b in benefits[:4]])
+
+    if size_param == "1024x1792":
+        layout_desc = """LAYOUT (vertical portrait):
+— TOP: large product name/headline, centered or left-aligned
+— CENTER-RIGHT: the product, large, dominant, on a podium or surface with shadow
+— LEFT SIDE: infographic block with benefits icons and text
+— BOTTOM: optional wide accent banner with key USP"""
+    elif size_param == "1792x1024":
+        layout_desc = """LAYOUT (horizontal landscape):
+— LEFT HALF: large product name/headline at top, infographic benefits below
+— RIGHT HALF: the product, large, on a surface with shadow
+— BOTTOM RIGHT: optional accent banner"""
+    else:
+        layout_desc = """LAYOUT (square):
+— TOP: large product name/headline
+— RIGHT HALF: the product, large, on a surface with shadow
+— LEFT HALF: infographic benefits list
+— BOTTOM: accent banner with key USP"""
 
     prompt = f"""Создай премиальную карточку товара для маркетплейса на основе загруженного фото товара.
 
 Главная задача:
 Превратить обычную фотографию товара в дорогую профессиональную marketplace-карточку уровня топовых брендов на Wildberries, Ozon, Amazon или Shopify.
+
+{layout_desc}
+
+ВАЖНО ПРО ТЕКСТ:
+— название бренда на карточке оставить на языке оригинала (латиницей если латиница) — НЕ переводить
+— название товара (тип продукта) написать на русском языке
+— все тексты преимуществ строго как указано ниже, не переводить, не перефразировать
 
 Что нужно сделать:
 
@@ -55,63 +90,44 @@ async def generate_card(
 — cinematic light
 — clean композиция
 — фон должен подчёркивать товар, а не отвлекать
-— допускаются: мягкие цветовые градиенты, интерьерные элементы, подиум, студийные прожекторы, отражения, premium textures
+— допускаются: мягкие цветовые градиенты, подиум, студийные прожекторы, отражения, premium textures
 
-3. Построить правильную композицию
-— товар должен быть главным объектом
-— композиция как у профессиональной рекламы
-— balanced layout
-— premium spacing
-— современная визуальная иерархия
-— карточка должна выглядеть дорого и clean
-
-4. Добавить инфографику
-Добавь современную инфографику в стиле premium marketplace design.
-Используй следующие преимущества товара (текст строго на русском языке, не переводить):
-
-{benefits_text}
-
-Оформление инфографики:
-— минималистичные иконки рядом с каждым преимуществом
-— аккуратные выделенные блоки или строки
+3. Инфографика — блок СЛЕВА от товара
+— минималистичные иконки рядом с каждым преимуществом (круг с символом)
+— каждое преимущество на отдельной строке
 — тонкие разделители между пунктами
-— современная типографика
-— стиль: clean, minimal, premium, expensive looking, readable
+— современная типографика, mixed case (не ALL CAPS)
+— стиль: clean, minimal, premium, readable
 — не перегружать дизайн
 
-5. Текст и типографика
-— крупный headline — название товара на русском (определи сам по фото)
+Преимущества товара (использовать точно этот текст):
+{benefits_text}
+
+4. Типографика
+— крупный headline: тип товара на русском + бренд на языке оригинала
 — bold sans-serif шрифт
-— feature blocks с иконками для каждого преимущества
-— текст преимуществ точно как указано выше, не изменять
+— mixed case (не ALL CAPS)
 — современная визуальная иерархия
 
-6. Общий стиль
-— ultra realistic
-— premium ecommerce advertising
-— luxury marketplace card
-— photorealistic
-— expensive commercial design
-— high-end product presentation
+5. Общий стиль
+— ultra realistic, premium ecommerce advertising
+— luxury marketplace card, photorealistic
+— expensive commercial design, high-end product presentation
 — realistic materials и realistic lighting
-— modern branding
-— premium color grading
+— modern branding, premium color grading
 
 Важно:
-— все тексты преимуществ строго на русском языке, точно как указано
-— не делать дешёвый дизайн
-— не использовать кислотные цвета
-— не делать шаблонную инфографику
+— не делать дешёвый дизайн, не использовать кислотные цвета
 — не ломать форму товара
-— товар должен выглядеть максимально дорого и привлекательно
-— итог должен выглядеть как работа профессионального дизайнера и рекламного агентства"""
+— товар стоит на поверхности с тенью — не висит в воздухе
+— итог должен выглядеть как работа профессионального дизайнера"""
 
     response = await client.images.edit(
         model="gpt-image-1",
         image=("product.png", png_bytes, "image/png"),
         prompt=prompt,
         n=1,
-        size="1024x1024",
+        size=size_param,
     )
 
     image_data = response.data[0].b64_json
