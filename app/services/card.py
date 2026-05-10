@@ -13,12 +13,10 @@ async def generate_card(
     aspect_ratio: str = "3:4",
 ) -> str:
 
-    # Скачиваем фото товара
     async with httpx.AsyncClient() as http:
         resp = await http.get(image_url)
         image_bytes = resp.content
 
-    # Конвертируем в PNG RGBA
     img = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
     size = max(img.size)
     square = Image.new("RGBA", (size, size), (255, 255, 255, 255))
@@ -30,57 +28,83 @@ async def generate_card(
     square.save(png_buffer, format="PNG")
     png_bytes = png_buffer.getvalue()
 
-    benefits_text = "\n".join([f"{i+1}. {b}" for i, b in enumerate(benefits[:4])])
+    benefits_text = "\n".join([f"— {b}" for b in benefits[:4]])
 
-    prompt = f"""Create a professional product infographic card for Russian marketplace (Wildberries/Ozon).
-Study the product carefully and create a card that matches top-selling listings.
+    prompt = f"""Создай премиальную карточку товара для маркетплейса на основе загруженного фото товара.
 
-BACKGROUND: Choose naturally based on the product:
-- Light/white background for household, cosmetics, food products
-- Dark background for tech, sports, premium products
-- The background should feel natural for this product category
+Главная задача:
+Превратить обычную фотографию товара в дорогую профессиональную marketplace-карточку уровня топовых брендов на Wildberries, Ozon, Amazon или Shopify.
 
-LAYOUT (square 1:1 format):
-TOP SECTION:
-- Large bold product name in Russian (mixed case, NOT ALL CAPS) — 2-4 words, black or white text depending on background
-- Diagonal colored accent stripe in top-right corner
+Что нужно сделать:
 
-RIGHT SIDE: The product from the photo, large, centered on its right half
-- Product must sit on a surface with a subtle shadow underneath (not floating in air)
-- Product should look well-lit and natural
+1. Обработать товар
+— аккуратно вырезать объект из исходного фона
+— улучшить качество товара
+— убрать дефекты, шум, потёртости, загрязнения, заломы и визуальные артефакты
+— сделать товар новым, чистым и премиальным
+— сохранить оригинальную форму, материал, цвет и особенности товара
+— добавить реалистичные блики, объём и мягкие тени
+— сохранить фотореализм
 
-LEFT SIDE: 3-4 benefit blocks, each containing:
-- A relevant emoji or simple filled icon (circle with symbol inside) in accent color
-- Benefit text in mixed case (first letter capital only), 2-3 lines max
-- Small divider line between items
+2. Создать premium background
+— дорогой минималистичный фон
+— современная студийная атмосфера
+— мягкое профессиональное освещение
+— премиальный стиль luxury ecommerce
+— realistic shadows
+— cinematic light
+— clean композиция
+— фон должен подчёркивать товар, а не отвлекать
+— допускаются: мягкие цветовые градиенты, интерьерные элементы, подиум, студийные прожекторы, отражения, premium textures
 
-BOTTOM BANNER:
-- Full-width colored banner (accent color matching the stripe)
-- Short key selling point text in white, bold, mixed case
+3. Построить правильную композицию
+— товар должен быть главным объектом
+— композиция как у профессиональной рекламы
+— balanced layout
+— premium spacing
+— современная визуальная иерархия
+— карточка должна выглядеть дорого и clean
 
-TYPOGRAPHY RULES:
-- Product title: very large, bold, mixed case (e.g. "Бутылка для воды" not "БУТЫЛКА")
-- Benefits: medium size, regular weight, mixed case
-- Banner text: bold, readable
-- NO all-caps except maybe 1-2 word abbreviations
+4. Добавить инфографику
+Добавь современную инфографику в стиле premium marketplace design.
+Используй следующие преимущества товара (текст строго на русском языке, не переводить):
 
-ACCENT COLOR: Pick one color that fits the product:
-- Bright green for eco/sports/outdoor
-- Electric blue for tech/electronics
-- Warm red for food/kitchen
-- Purple for cosmetics/beauty
-- Orange for tools/construction
-
-PRODUCT BENEFITS to show:
 {benefits_text}
 
-CRITICAL RULES:
-- All text in Russian
-- Do NOT change the product — keep it exactly as in the photo
-- Product must have a shadow/ground — not floating
-- Clean professional look matching top WB/Ozon sellers
-- NO cheap gradients, NO clipart style icons
-- The card should look like it was made by a professional designer"""
+Оформление инфографики:
+— минималистичные иконки рядом с каждым преимуществом
+— аккуратные выделенные блоки или строки
+— тонкие разделители между пунктами
+— современная типографика
+— стиль: clean, minimal, premium, expensive looking, readable
+— не перегружать дизайн
+
+5. Текст и типографика
+— крупный headline — название товара на русском (определи сам по фото)
+— bold sans-serif шрифт
+— feature blocks с иконками для каждого преимущества
+— текст преимуществ точно как указано выше, не изменять
+— современная визуальная иерархия
+
+6. Общий стиль
+— ultra realistic
+— premium ecommerce advertising
+— luxury marketplace card
+— photorealistic
+— expensive commercial design
+— high-end product presentation
+— realistic materials и realistic lighting
+— modern branding
+— premium color grading
+
+Важно:
+— все тексты преимуществ строго на русском языке, точно как указано
+— не делать дешёвый дизайн
+— не использовать кислотные цвета
+— не делать шаблонную инфографику
+— не ломать форму товара
+— товар должен выглядеть максимально дорого и привлекательно
+— итог должен выглядеть как работа профессионального дизайнера и рекламного агентства"""
 
     response = await client.images.edit(
         model="gpt-image-1",
