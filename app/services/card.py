@@ -7,11 +7,11 @@ from app.config import settings
 client = AsyncOpenAI(api_key=settings.openai_api_key)
 
 ASPECT_RATIO_MAP = {
-    "9:16": "1024x1792",
-    "3:4":  "1024x1792",
+    "9:16": "1024x1536",
+    "3:4":  "1024x1536",
     "1:1":  "1024x1024",
-    "4:3":  "1792x1024",
-    "16:9": "1792x1024",
+    "4:3":  "1536x1024",
+    "16:9": "1536x1024",
 }
 
 
@@ -36,17 +36,17 @@ async def generate_card(
     square.save(png_buffer, format="PNG")
     png_bytes = png_buffer.getvalue()
 
-    size_param = ASPECT_RATIO_MAP.get(aspect_ratio, "1024x1792")
+    size_param = ASPECT_RATIO_MAP.get(aspect_ratio, "1024x1536")
 
     benefits_text = "\n".join([f"— {b}" for b in benefits[:4]])
 
-    if size_param == "1024x1792":
+    if size_param == "1024x1536":
         layout_desc = """LAYOUT (vertical portrait):
 — TOP: large product name/headline, centered or left-aligned
 — CENTER-RIGHT: the product, large, dominant, on a podium or surface with shadow
 — LEFT SIDE: infographic block with benefits icons and text
 — BOTTOM: optional wide accent banner with key USP"""
-    elif size_param == "1792x1024":
+    elif size_param == "1536x1024":
         layout_desc = """LAYOUT (horizontal landscape):
 — LEFT HALF: large product name/headline at top, infographic benefits below
 — RIGHT HALF: the product, large, on a surface with shadow
