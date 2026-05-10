@@ -13,12 +13,10 @@ async def generate_card(
     aspect_ratio: str = "3:4",
 ) -> str:
 
-    # Скачиваем фото товара
     async with httpx.AsyncClient() as http:
         resp = await http.get(image_url)
         image_bytes = resp.content
 
-    # Конвертируем в PNG RGBA
     img = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
     size = max(img.size)
     square = Image.new("RGBA", (size, size), (255, 255, 255, 255))
@@ -30,18 +28,34 @@ async def generate_card(
     square.save(png_buffer, format="PNG")
     png_bytes = png_buffer.getvalue()
 
-    benefits_text = "\n".join([f"• {b}" for b in benefits[:6]])
+    benefits_text = "\n".join([f"{i+1}. {b}" for i, b in enumerate(benefits[:6])])
 
-    prompt = f"""Create a professional Russian marketplace product card infographic for Wildberries or Ozon.
+    prompt = f"""You are a premium Russian marketplace designer. Create a stunning product infographic card.
 
-Keep the product from the image and add:
-- Clean white background
-- Bold Russian headline at top describing the product
-- Benefits list with green checkmark icons on the left:
+STYLE: Dark premium design. Deep dark background (near black or very dark navy/charcoal).
+Vibrant accent color (bright green, electric blue, or bold red — pick what fits the product).
+High contrast. Professional. Looks like a top-selling WB/Ozon listing.
+
+LAYOUT (portrait orientation):
+- TOP LEFT: Large bold product headline in Russian (2-3 words, white text, heavy font)
+- TOP RIGHT: The product from the image, large, well-lit, slightly angled for drama
+- Diagonal or angular accent stripe behind the product (accent color)
+- MIDDLE/LEFT: Each benefit as a separate badge/block:
+  - Small icon or geometric shape in accent color on the left
+  - Bold label in white (the benefit text)
+  - Dark semi-transparent background per item
+- BOTTOM: Wide accent-colored banner with a short call-to-action or key spec
+
+PRODUCT BENEFITS to include:
 {benefits_text}
-- Modern professional e-commerce design
+
+RULES:
 - All text in Russian
-- Similar to top WB/Ozon product listings"""
+- Keep the exact product from the image — do not alter it
+- No cheap clipart, no gradients that look like MS Word
+- Typography must look premium: mix of heavy bold and light thin weights
+- Shadows, glows, depth — make it feel 3D and dynamic
+- Think: high-end sports brand or premium tech product packaging"""
 
     response = await client.images.edit(
         model="gpt-image-1",
@@ -53,5 +67,4 @@ Keep the product from the image and add:
 
     image_data = response.data[0].b64_json
 
-    # Всегда возвращаем base64 — сохранение в Storage делает generations.py
     return f"data:image/png;base64,{image_data}"
