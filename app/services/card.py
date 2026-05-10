@@ -13,10 +13,12 @@ async def generate_card(
     aspect_ratio: str = "3:4",
 ) -> str:
 
+    # Скачиваем фото товара
     async with httpx.AsyncClient() as http:
         resp = await http.get(image_url)
         image_bytes = resp.content
 
+    # Конвертируем в PNG RGBA
     img = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
     size = max(img.size)
     square = Image.new("RGBA", (size, size), (255, 255, 255, 255))
@@ -28,34 +30,57 @@ async def generate_card(
     square.save(png_buffer, format="PNG")
     png_bytes = png_buffer.getvalue()
 
-    benefits_text = "\n".join([f"{i+1}. {b}" for i, b in enumerate(benefits[:6])])
+    benefits_text = "\n".join([f"{i+1}. {b}" for i, b in enumerate(benefits[:4])])
 
-    prompt = f"""You are a premium Russian marketplace designer. Create a stunning product infographic card.
+    prompt = f"""Create a professional product infographic card for Russian marketplace (Wildberries/Ozon).
+Study the product carefully and create a card that matches top-selling listings.
 
-STYLE: Dark premium design. Deep dark background (near black or very dark navy/charcoal).
-Vibrant accent color (bright green, electric blue, or bold red — pick what fits the product).
-High contrast. Professional. Looks like a top-selling WB/Ozon listing.
+BACKGROUND: Choose naturally based on the product:
+- Light/white background for household, cosmetics, food products
+- Dark background for tech, sports, premium products
+- The background should feel natural for this product category
 
-LAYOUT (portrait orientation):
-- TOP LEFT: Large bold product headline in Russian (2-3 words, white text, heavy font)
-- TOP RIGHT: The product from the image, large, well-lit, slightly angled for drama
-- Diagonal or angular accent stripe behind the product (accent color)
-- MIDDLE/LEFT: Each benefit as a separate badge/block:
-  - Small icon or geometric shape in accent color on the left
-  - Bold label in white (the benefit text)
-  - Dark semi-transparent background per item
-- BOTTOM: Wide accent-colored banner with a short call-to-action or key spec
+LAYOUT (square 1:1 format):
+TOP SECTION:
+- Large bold product name in Russian (mixed case, NOT ALL CAPS) — 2-4 words, black or white text depending on background
+- Diagonal colored accent stripe in top-right corner
 
-PRODUCT BENEFITS to include:
+RIGHT SIDE: The product from the photo, large, centered on its right half
+- Product must sit on a surface with a subtle shadow underneath (not floating in air)
+- Product should look well-lit and natural
+
+LEFT SIDE: 3-4 benefit blocks, each containing:
+- A relevant emoji or simple filled icon (circle with symbol inside) in accent color
+- Benefit text in mixed case (first letter capital only), 2-3 lines max
+- Small divider line between items
+
+BOTTOM BANNER:
+- Full-width colored banner (accent color matching the stripe)
+- Short key selling point text in white, bold, mixed case
+
+TYPOGRAPHY RULES:
+- Product title: very large, bold, mixed case (e.g. "Бутылка для воды" not "БУТЫЛКА")
+- Benefits: medium size, regular weight, mixed case
+- Banner text: bold, readable
+- NO all-caps except maybe 1-2 word abbreviations
+
+ACCENT COLOR: Pick one color that fits the product:
+- Bright green for eco/sports/outdoor
+- Electric blue for tech/electronics
+- Warm red for food/kitchen
+- Purple for cosmetics/beauty
+- Orange for tools/construction
+
+PRODUCT BENEFITS to show:
 {benefits_text}
 
-RULES:
+CRITICAL RULES:
 - All text in Russian
-- Keep the exact product from the image — do not alter it
-- No cheap clipart, no gradients that look like MS Word
-- Typography must look premium: mix of heavy bold and light thin weights
-- Shadows, glows, depth — make it feel 3D and dynamic
-- Think: high-end sports brand or premium tech product packaging"""
+- Do NOT change the product — keep it exactly as in the photo
+- Product must have a shadow/ground — not floating
+- Clean professional look matching top WB/Ozon sellers
+- NO cheap gradients, NO clipart style icons
+- The card should look like it was made by a professional designer"""
 
     response = await client.images.edit(
         model="gpt-image-1",
