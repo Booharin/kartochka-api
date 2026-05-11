@@ -36,7 +36,7 @@ CATEGORY_MODEL_MAP: dict[str, ModelType] = {
     "electronics": "gpt-image-1",
     "cosmetics": "bria-product-shot",
     "home": "gpt-image-1",
-    "default": "flux-kontext",
+    "default": "nano-banana",
 }
 
 GPT_SIZE_MAP = {
