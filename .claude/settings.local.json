@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(find /Users/sashabooharin/Git/kartochka -name \"api.ts\" 2>/dev/null)",
-      "Read(//Users/sashabooharin/Git/kartochka/**)"
+      "Read(//Users/sashabooharin/Git/kartochka/**)",
+      "Bash(find /Users/sashabooharin/Git -name \"api.ts\" 2>/dev/null)",
+      "Read(//Users/sashabooharin/Git/**)"
     ]
   }
 }

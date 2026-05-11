@@ -1,17 +1,22 @@
-from fastapi import APIRouter, HTTPException, Header, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, Header, UploadFile, File, Form, BackgroundTasks
 from app.database import get_supabase, get_supabase_admin
 from app.services.card import generate_card
 from openai import AsyncOpenAI
 from app.config import settings
+from PIL import Image
+import httpx
 import fal_client
 import os
 import uuid
 import base64
+import io
 
 os.environ["FAL_KEY"] = settings.fal_key
 openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
 
 router = APIRouter(prefix="/tools", tags=["tools"])
+
+API_BASE = "https://api.kartochka.top"
 
 
 def get_user_id(token: str) -> str:
@@ -22,6 +27,41 @@ def get_user_id(token: str) -> str:
         return response.user.id
     except:
         raise HTTPException(status_code=401, detail="Токен недействителен")
+
+
+async def run_card_generation(
+    generation_id: str,
+    user_id: str,
+    input_url: str,
+    benefits: list,
+    aspect_ratio: str,
+    credits_left: int,
+):
+    admin = get_supabase_admin()
+    try:
+        result_url = await generate_card(
+            image_url=input_url,
+            benefits=benefits,
+            aspect_ratio=aspect_ratio,
+        )
+
+        admin.table("generations").update({
+            "status": "done",
+            "result_url": result_url,
+        }).eq("id", generation_id).execute()
+
+        admin.table("subscriptions").update({
+            "credits_left": credits_left - 1
+        }).eq("user_id", user_id).execute()
+
+        print(f"[card] done generation_id={generation_id}")
+
+    except Exception as e:
+        admin.table("generations").update({
+            "status": "failed",
+            "error_message": str(e)
+        }).eq("id", generation_id).execute()
+        print(f"[card] failed generation_id={generation_id} error={str(e)}")
 
 
 @router.post("/suggest-benefits")
@@ -112,8 +152,28 @@ async def remove_background(
             "fal-ai/bria/background/remove",
             arguments={"image_url": input_url}
         )
+        transparent_url = result["image"]["url"]
 
-        result_url = result["image"]["url"]
+        async with httpx.AsyncClient(timeout=60) as http:
+            resp = await http.get(transparent_url)
+            img_bytes = resp.content
+
+        img = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
+        white_bg = Image.new("RGBA", img.size, (255, 255, 255, 255))
+        white_bg.paste(img, mask=img.split()[3])
+        white_bg = white_bg.convert("RGB")
+
+        buf = io.BytesIO()
+        white_bg.save(buf, format="JPEG", quality=95)
+        result_bytes = buf.getvalue()
+
+        result_path = f"{user_id}/removebg/{uuid.uuid4()}.jpg"
+        admin.storage.from_("results").upload(
+            path=result_path,
+            file=result_bytes,
+            file_options={"content-type": "image/jpeg"}
+        )
+        result_url = f"{API_BASE}/files/results/{result_path}"
 
         admin.table("subscriptions").update({
             "credits_left": sub.data["credits_left"] - 1
@@ -130,6 +190,7 @@ async def remove_background(
 
 @router.post("/generate-card")
 async def create_card(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     authorization: str = Header(...),
     card_text: str = Form(...),
@@ -163,30 +224,27 @@ async def create_card(
 
     benefits = [b.strip() for b in card_text.strip().split("\n") if b.strip()]
 
-    try:
-        result_url = await generate_card(
-            image_url=input_url,
-            benefits=benefits,
-            aspect_ratio=aspect_ratio,
-        )
+    gen = admin.table("generations").insert({
+        "user_id": user_id,
+        "status": "processing",
+        "concept": "card",
+        "input_url": input_url,
+        "model": "gpt-image-1",
+    }).execute()
 
-        admin.table("generations").insert({
-            "user_id": user_id,
-            "status": "done",
-            "concept": "card",
-            "input_url": input_url,
-            "result_url": result_url,
-            "model": "gpt-image-1",
-        }).execute()
+    generation_id = gen.data[0]["id"]
 
-        admin.table("subscriptions").update({
-            "credits_left": sub.data["credits_left"] - 1
-        }).eq("user_id", user_id).execute()
+    background_tasks.add_task(
+        run_card_generation,
+        generation_id=generation_id,
+        user_id=user_id,
+        input_url=input_url,
+        benefits=benefits,
+        aspect_ratio=aspect_ratio,
+        credits_left=sub.data["credits_left"],
+    )
 
-        return {
-            "result_url": result_url,
-            "credits_left": sub.data["credits_left"] - 1
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка: {str(e)}")
+    return {
+        "generation_id": generation_id,
+        "status": "processing",
+    }

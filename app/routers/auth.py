@@ -4,7 +4,6 @@ from app.database import get_supabase, get_supabase_admin
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-# --- Модели запросов ---
 
 class RegisterRequest(BaseModel):
     email: str
@@ -15,8 +14,9 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+class RefreshRequest(BaseModel):
+    refresh_token: str
 
-# --- Регистрация ---
 
 @router.post("/register")
 async def register(body: RegisterRequest):
@@ -33,8 +33,6 @@ async def register(body: RegisterRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-
-# --- Логин ---
 
 @router.post("/login")
 async def login(body: LoginRequest):
@@ -53,7 +51,18 @@ async def login(body: LoginRequest):
         raise HTTPException(status_code=401, detail="Неверный email или пароль")
 
 
-# --- Получить текущего пользователя ---
+@router.post("/refresh")
+async def refresh(body: RefreshRequest):
+    supabase = get_supabase()
+    try:
+        response = supabase.auth.refresh_session(body.refresh_token)
+        return {
+            "access_token": response.session.access_token,
+            "refresh_token": response.session.refresh_token,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=401, detail="Refresh token недействителен")
+
 
 @router.get("/me")
 async def get_me(authorization: str = Header(...)):
@@ -62,7 +71,6 @@ async def get_me(authorization: str = Header(...)):
     try:
         response = supabase.auth.get_user(token)
 
-        # Получаем подписку пользователя
         admin = get_supabase_admin()
         subscription = admin.table("subscriptions")\
             .select("*")\

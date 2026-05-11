@@ -39,9 +39,24 @@ CATEGORY_MODEL_MAP: dict[str, ModelType] = {
     "default": "flux-kontext",
 }
 
+GPT_SIZE_MAP = {
+    "9:16": "1024x1536",
+    "3:4":  "1024x1536",
+    "1:1":  "1024x1024",
+    "4:3":  "1536x1024",
+    "16:9": "1536x1024",
+}
+
+FLUX_RATIO_MAP = {
+    "9:16": "9:16",
+    "3:4":  "3:4",
+    "1:1":  "1:1",
+    "4:3":  "4:3",
+    "16:9": "16:9",
+}
+
 
 def get_prompt_preview(model: str, concept: str, user_prompt: Optional[str] = None) -> str:
-    """Возвращает промпт который будет отправлен модели — для отображения в UI"""
     concept_text = CONCEPT_PROMPTS.get(concept, CONCEPT_PROMPTS["studio"])
     if user_prompt:
         concept_text += f" Additional: {user_prompt}"
@@ -72,9 +87,10 @@ async def _remove_bg(image_url: str) -> str:
     return result["image"]["url"]
 
 
-async def _generate_flux_kontext(image_url: str, concept: str, prompt: Optional[str]) -> str:
+async def _generate_flux_kontext(image_url: str, concept: str, prompt: Optional[str], aspect_ratio: str = "1:1") -> str:
     clean_url = await _remove_bg(image_url)
     final_prompt = get_prompt_preview("flux-kontext", concept, prompt)
+    flux_ratio = FLUX_RATIO_MAP.get(aspect_ratio, "1:1")
     result = await fal_client.run_async(
         "fal-ai/flux-pro/kontext",
         arguments={
@@ -84,21 +100,27 @@ async def _generate_flux_kontext(image_url: str, concept: str, prompt: Optional[
             "guidance_scale": 3.5,
             "num_images": 1,
             "output_format": "jpeg",
+            "aspect_ratio": flux_ratio,
         }
     )
+    print(f"[flux-kontext] aspect_ratio={flux_ratio} timings={result.get('timings', {})}")
     return result["images"][0]["url"]
 
 
-async def _generate_gpt_image(image_url: str, concept: str, prompt: Optional[str]) -> str:
+async def _generate_gpt_image(image_url: str, concept: str, prompt: Optional[str], aspect_ratio: str = "1:1") -> str:
     png_bytes = await _load_image_as_png(image_url)
     final_prompt = get_prompt_preview("gpt-image-1", concept, prompt)
+    size = GPT_SIZE_MAP.get(aspect_ratio, "1024x1024")
     response = await openai_client.images.edit(
         model="gpt-image-1",
         image=("product.png", png_bytes, "image/png"),
         prompt=final_prompt,
         n=1,
-        size="1024x1024",
+        size=size,
     )
+    usage = getattr(response, "usage", None)
+    if usage:
+        print(f"[gpt-image-1] input_tokens={usage.input_tokens} output_tokens={usage.output_tokens} total={usage.total_tokens}")
     return f"data:image/png;base64,{response.data[0].b64_json}"
 
 
@@ -129,6 +151,10 @@ async def _generate_nano_banana(image_url: str, concept: str, prompt: Optional[s
         )
     )
 
+    usage = getattr(response, "usage_metadata", None)
+    if usage:
+        print(f"[nano-banana] input_tokens={usage.prompt_token_count} output_tokens={usage.candidates_token_count} total={usage.total_token_count}")
+
     for part in response.candidates[0].content.parts:
         if part.inline_data and part.inline_data.mime_type.startswith("image"):
             img_b64 = base64.b64encode(part.inline_data.data).decode()
@@ -152,15 +178,15 @@ async def generate_product_shot(
     else:
         selected = CATEGORY_MODEL_MAP["default"]
 
-    print(f"[generation] concept={concept} model={selected}")
+    print(f"[generation] concept={concept} model={selected} aspect_ratio={aspect_ratio}")
 
     if selected == "flux-kontext":
-        return await _generate_flux_kontext(image_url, concept, prompt)
+        return await _generate_flux_kontext(image_url, concept, prompt, aspect_ratio)
     elif selected == "gpt-image-1":
-        return await _generate_gpt_image(image_url, concept, prompt)
+        return await _generate_gpt_image(image_url, concept, prompt, aspect_ratio)
     elif selected == "bria-product-shot":
         return await _generate_bria(image_url, concept, prompt)
     elif selected == "nano-banana":
         return await _generate_nano_banana(image_url, concept, prompt)
     else:
-        return await _generate_flux_kontext(image_url, concept, prompt)
+        return await _generate_flux_kontext(image_url, concept, prompt, aspect_ratio)
