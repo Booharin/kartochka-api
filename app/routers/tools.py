@@ -176,6 +176,7 @@ async def create_card(
             "concept": "card",
             "input_url": input_url,
             "result_url": result_url,
+            "model": "gpt-image-1",
         }).execute()
 
         admin.table("subscriptions").update({
