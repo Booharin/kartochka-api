@@ -9,6 +9,7 @@ import base64 as b64lib
 router = APIRouter(prefix="/generations", tags=["generations"])
 
 API_BASE = "https://api.kartochka.top"
+PAGE_SIZE = 20
 
 
 def get_user_id(token: str) -> str:
@@ -129,7 +130,7 @@ async def create_generation(
         "status": "processing",
         "concept": concept,
         "input_url": input_url,
-        "model": model or "flux-kontext",
+        "model": model or "nano-banana",
     }).execute()
 
     generation_id = gen.data[0]["id"]
@@ -163,7 +164,11 @@ async def prompt_preview(
 
 
 @router.get("/")
-async def get_generations(authorization: str = Header(...)):
+async def get_generations(
+    authorization: str = Header(...),
+    limit: int = 20,
+    offset: int = 0,
+):
     token = authorization.replace("Bearer ", "")
     user_id = get_user_id(token)
     admin = get_supabase_admin()
@@ -172,9 +177,14 @@ async def get_generations(authorization: str = Header(...)):
         .select("*")\
         .eq("user_id", user_id)\
         .order("created_at", desc=True)\
+        .limit(limit)\
+        .offset(offset)\
         .execute()
 
-    return {"generations": result.data}
+    return {
+        "generations": result.data,
+        "has_more": len(result.data) == limit,
+    }
 
 
 @router.get("/{generation_id}")
