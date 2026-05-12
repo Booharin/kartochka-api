@@ -35,6 +35,8 @@ async def run_card_generation(
     input_url: str,
     benefits: list,
     aspect_ratio: str,
+    title: str,
+    bottom_text: str,
     credits_left: int,
 ):
     admin = get_supabase_admin()
@@ -43,6 +45,8 @@ async def run_card_generation(
             image_url=input_url,
             benefits=benefits,
             aspect_ratio=aspect_ratio,
+            title=title,
+            bottom_text=bottom_text,
         )
 
         admin.table("generations").update({
@@ -64,8 +68,8 @@ async def run_card_generation(
         print(f"[card] failed generation_id={generation_id} error={str(e)}")
 
 
-@router.post("/suggest-benefits")
-async def suggest_benefits(
+@router.post("/suggest-card-fields")
+async def suggest_card_fields(
     file: UploadFile = File(...),
     authorization: str = Header(...),
 ):
@@ -94,24 +98,62 @@ async def suggest_benefits(
                             "type": "text",
                             "text": (
                                 "Ты эксперт по маркетплейсам Wildberries и Ozon. "
-                                "Посмотри на фото товара и придумай ровно 4 коротких преимущества "
-                                "для карточки инфографики. "
-                                "Каждое преимущество — одна строка, максимум 6 слов, на русском языке. "
-                                "Отвечай ТОЛЬКО 4 строками без нумерации, без лишнего текста, без кавычек."
+                                "Посмотри на фото товара и верни JSON строго в таком формате без лишнего текста:\n"
+                                '{"title": "Название товара (2-4 слова, русский)", '
+                                '"benefits": ["преимущество 1", "преимущество 2", "преимущество 3", "преимущество 4"], '
+                                '"bottom_text": "Короткий слоган для баннера (2-5 слов, русский, ЗАГЛАВНЫМИ)"}'
+                                "\n\nПравила:\n"
+                                "- title: тип товара без бренда, 2-4 слова\n"
+                                "- benefits: ровно 4 строки, каждое максимум 6 слов\n"
+                                "- bottom_text: ключевое УТП, 2-5 слов заглавными буквами"
                             ),
                         },
                     ],
                 }
             ],
-            max_tokens=200,
+            max_tokens=300,
             temperature=0.7,
         )
 
+        import json
+        text = response.choices[0].message.content.strip()
+        text = text.replace("```json", "").replace("```", "").strip()
+        data = json.loads(text)
+
+        return {
+            "title": data.get("title", ""),
+            "benefits": data.get("benefits", [])[:4],
+            "bottom_text": data.get("bottom_text", ""),
+        }
+
+    except Exception:
+        return {"title": "", "benefits": [], "bottom_text": ""}
+
+
+@router.post("/suggest-benefits")
+async def suggest_benefits(
+    file: UploadFile = File(...),
+    authorization: str = Header(...),
+):
+    token = authorization.replace("Bearer ", "")
+    get_user_id(token)
+
+    file_content = await file.read()
+    image_b64 = base64.b64encode(file_content).decode()
+    mime_type = file.content_type or "image/jpeg"
+
+    try:
+        response = await openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": [
+                {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{image_b64}", "detail": "low"}},
+                {"type": "text", "text": "Придумай ровно 4 коротких преимущества товара на русском языке. Только 4 строки без нумерации."},
+            ]}],
+            max_tokens=200, temperature=0.7,
+        )
         text = response.choices[0].message.content.strip()
         benefits = [line.strip() for line in text.split("\n") if line.strip()][:4]
-
         return {"benefits": benefits}
-
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка анализа: {str(e)}")
 
@@ -139,8 +181,7 @@ async def remove_background(
     file_path = f"{user_id}/{uuid.uuid4()}.{file_ext}"
 
     admin.storage.from_("inputs").upload(
-        path=file_path,
-        file=file_content,
+        path=file_path, file=file_content,
         file_options={"content-type": file.content_type}
     )
 
@@ -169,20 +210,25 @@ async def remove_background(
 
         result_path = f"{user_id}/removebg/{uuid.uuid4()}.jpg"
         admin.storage.from_("results").upload(
-            path=result_path,
-            file=result_bytes,
+            path=result_path, file=result_bytes,
             file_options={"content-type": "image/jpeg"}
         )
         result_url = f"{API_BASE}/files/results/{result_path}"
+
+        admin.table("generations").insert({
+            "user_id": user_id,
+            "status": "done",
+            "concept": "removebg",
+            "input_url": input_url,
+            "result_url": result_url,
+            "model": "bria",
+        }).execute()
 
         admin.table("subscriptions").update({
             "credits_left": sub.data["credits_left"] - 1
         }).eq("user_id", user_id).execute()
 
-        return {
-            "result_url": result_url,
-            "credits_left": sub.data["credits_left"] - 1
-        }
+        return {"result_url": result_url, "credits_left": sub.data["credits_left"] - 1}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка: {str(e)}")
@@ -195,6 +241,8 @@ async def create_card(
     authorization: str = Header(...),
     card_text: str = Form(...),
     aspect_ratio: str = Form("3:4"),
+    title: str = Form(""),
+    bottom_text: str = Form(""),
 ):
     token = authorization.replace("Bearer ", "")
     user_id = get_user_id(token)
@@ -214,8 +262,7 @@ async def create_card(
     file_path = f"{user_id}/{uuid.uuid4()}.{file_ext}"
 
     admin.storage.from_("inputs").upload(
-        path=file_path,
-        file=file_content,
+        path=file_path, file=file_content,
         file_options={"content-type": file.content_type}
     )
 
@@ -241,10 +288,9 @@ async def create_card(
         input_url=input_url,
         benefits=benefits,
         aspect_ratio=aspect_ratio,
+        title=title,
+        bottom_text=bottom_text,
         credits_left=sub.data["credits_left"],
     )
 
-    return {
-        "generation_id": generation_id,
-        "status": "processing",
-    }
+    return {"generation_id": generation_id, "status": "processing"}

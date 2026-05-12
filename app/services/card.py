@@ -19,6 +19,8 @@ async def generate_card(
     image_url: str,
     benefits: list[str],
     aspect_ratio: str = "3:4",
+    title: str = "",
+    bottom_text: str = "",
 ) -> str:
 
     async with httpx.AsyncClient() as http:
@@ -38,25 +40,28 @@ async def generate_card(
 
     size_param = ASPECT_RATIO_MAP.get(aspect_ratio, "1024x1536")
 
-    benefits_text = "\n".join([f"— {b}" for b in benefits[:4]])
+    benefits_text = "\n".join([f"✓ {b}" for b in benefits[:4]])
+
+    title_instruction = f"Заголовок вверху карточки: «{title}»" if title else "Заголовок: определи сам по типу товара, на русском, 2-4 слова"
+    bottom_instruction = f"Текст в нижнем баннере: «{bottom_text}»" if bottom_text else "Нижний баннер: короткое УТП, 2-4 слова заглавными"
 
     if size_param == "1024x1536":
         layout_desc = """LAYOUT (vertical portrait):
-— TOP: large product name/headline, centered or left-aligned
+— TOP: large product headline, left-aligned or centered
 — CENTER-RIGHT: the product, large, dominant, on a podium or surface with shadow
 — LEFT SIDE: infographic block with benefits icons and text
-— BOTTOM: optional wide accent banner with key USP"""
+— BOTTOM: wide accent banner with key text"""
     elif size_param == "1536x1024":
         layout_desc = """LAYOUT (horizontal landscape):
-— LEFT HALF: large product name/headline at top, infographic benefits below
+— LEFT HALF: large product headline at top, infographic benefits below
 — RIGHT HALF: the product, large, on a surface with shadow
-— BOTTOM RIGHT: optional accent banner"""
+— BOTTOM: accent banner"""
     else:
         layout_desc = """LAYOUT (square):
-— TOP: large product name/headline
+— TOP: large product headline
 — RIGHT HALF: the product, large, on a surface with shadow
 — LEFT HALF: infographic benefits list
-— BOTTOM: accent banner with key USP"""
+— BOTTOM: accent banner"""
 
     prompt = f"""Создай премиальную карточку товара для маркетплейса на основе загруженного фото товара.
 
@@ -65,9 +70,10 @@ async def generate_card(
 
 {layout_desc}
 
-ВАЖНО ПРО ТЕКСТ:
-— НЕ добавлять название бренда на карточку
-— название товара (тип продукта) написать на русском языке, без бренда
+ТЕКСТ НА КАРТОЧКЕ (использовать строго):
+— {title_instruction}
+— {bottom_instruction}
+— НЕ добавлять название бренда
 — все тексты преимуществ строго как указано ниже, не переводить, не перефразировать
 
 Что нужно сделать:
@@ -86,11 +92,8 @@ async def generate_card(
 — современная студийная атмосфера
 — мягкое профессиональное освещение
 — премиальный стиль luxury ecommerce
-— realistic shadows
-— cinematic light
-— clean композиция
+— realistic shadows, cinematic light, clean композиция
 — фон должен подчёркивать товар, а не отвлекать
-— допускаются: мягкие цветовые градиенты, подиум, студийные прожекторы, отражения, premium textures
 
 3. Инфографика — блок СЛЕВА от товара
 — минималистичные иконки рядом с каждым преимуществом (круг с символом)
@@ -98,15 +101,13 @@ async def generate_card(
 — тонкие разделители между пунктами
 — современная типографика, mixed case (не ALL CAPS)
 — стиль: clean, minimal, premium, readable
-— не перегружать дизайн
 
 Преимущества товара (использовать точно этот текст):
 {benefits_text}
 
 4. Типографика
-— крупный headline: тип товара на русском + бренд на языке оригинала
 — bold sans-serif шрифт
-— mixed case (не ALL CAPS)
+— mixed case (не ALL CAPS) кроме нижнего баннера
 — современная визуальная иерархия
 
 5. Общий стиль
@@ -131,5 +132,4 @@ async def generate_card(
     )
 
     image_data = response.data[0].b64_json
-
     return f"data:image/png;base64,{image_data}"
