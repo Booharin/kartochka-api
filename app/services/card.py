@@ -42,8 +42,17 @@ async def generate_card(
 
     benefits_text = "\n".join([f"✓ {b}" for b in benefits[:4]])
 
-    title_instruction = f"Заголовок вверху карточки: «{title}»" if title else "Заголовок: определи сам по типу товара, на русском, 2-4 слова"
-    bottom_instruction = f"Текст в нижнем баннере: «{bottom_text}»" if bottom_text else "Нижний баннер: короткое УТП, 2-4 слова заглавными"
+    title_instruction = f"Заголовок вверху карточки: «{title}»" if title else "заголовок карточки: НЕ добавлять, оставить без заголовка"
+    bottom_instruction = f"Текст в нижнем баннере: «{bottom_text}»" if bottom_text else "нижний баннер: НЕ добавлять, оставить без баннера"
+    benefits_instruction = f"""3. Инфографика — блок СЛЕВА от товара
+— минималистичные иконки рядом с каждым преимуществом (круг с символом)
+— каждое преимущество на отдельной строке
+— тонкие разделители между пунктами
+— современная типографика, mixed case (не ALL CAPS)
+— стиль: clean, minimal, premium, readable
+
+Преимущества товара (использовать точно этот текст):
+{benefits_text}""" if benefits else "3. Инфографика — НЕ добавлять блок с преимуществами, оставить чистое пространство"
 
     if size_param == "1024x1536":
         layout_desc = """LAYOUT (vertical portrait):
@@ -95,15 +104,7 @@ async def generate_card(
 — realistic shadows, cinematic light, clean композиция
 — фон должен подчёркивать товар, а не отвлекать
 
-3. Инфографика — блок СЛЕВА от товара
-— минималистичные иконки рядом с каждым преимуществом (круг с символом)
-— каждое преимущество на отдельной строке
-— тонкие разделители между пунктами
-— современная типографика, mixed case (не ALL CAPS)
-— стиль: clean, minimal, premium, readable
-
-Преимущества товара (использовать точно этот текст):
-{benefits_text}
+{benefits_instruction}
 
 4. Типографика
 — bold sans-serif шрифт
