@@ -47,6 +47,7 @@ async def generate_card(
     benefits_instruction = f"""3. Инфографика — блок СЛЕВА от товара
 — минималистичные иконки рядом с каждым преимуществом (круг с символом)
 — каждое преимущество на отдельной строке
+— блок инфографики вертикально по центру карточки (не внизу)
 — тонкие разделители между пунктами
 — современная типографика, mixed case (не ALL CAPS)
 — стиль: clean, minimal, premium, readable
@@ -58,7 +59,7 @@ async def generate_card(
         layout_desc = """LAYOUT (vertical portrait):
 — TOP: large product headline, left-aligned or centered
 — CENTER-RIGHT: the product, large, dominant, on a podium or surface with shadow
-— LEFT SIDE: infographic block with benefits icons and text
+— LEFT SIDE: infographic block with benefits icons and text, vertically centered in the middle of the card
 — BOTTOM: wide accent banner with key text"""
     elif size_param == "1536x1024":
         layout_desc = """LAYOUT (horizontal landscape):
@@ -83,7 +84,9 @@ async def generate_card(
 — {title_instruction}
 — {bottom_instruction}
 — НЕ добавлять название бренда
-— все тексты преимуществ строго как указано ниже, не переводить, не перефразировать
+— КРИТИЧНО: все тексты преимуществ использовать ДОСЛОВНО как указано ниже
+— ЗАПРЕЩЕНО переводить на английский или любой другой язык
+— ЗАПРЕЩЕНО перефразировать или изменять текст преимуществ
 
 Что нужно сделать:
 
