@@ -22,6 +22,8 @@ async def generate_card(
     title: str = "",
     bottom_text: str = "",
     card_prompt: str = "",
+    bg_color_hex: str = "",
+    bg_color_name: str = "",
 ) -> str:
 
     async with httpx.AsyncClient() as http:
@@ -74,7 +76,14 @@ async def generate_card(
 — LEFT HALF: infographic benefits list
 — BOTTOM: accent banner"""
 
-    user_prompt_block = f"""ГЛАВНОЕ ПОЖЕЛАНИЕ ПОЛЬЗОВАТЕЛЯ (наивысший приоритет, реализовать обязательно):
+    bg_color_block = f"""ЦВЕТ ФОНА (ОБЯЗАТЕЛЬНО, наивысший приоритет — игнорировать все остальные инструкции по цвету фона):
+— использовать СТРОГО этот цвет фона: {bg_color_name} ({bg_color_hex})
+— весь фон карточки должен быть именно этого цвета
+— не заменять другим цветом, не смешивать, не градиент если не просит пользователь
+
+""" if bg_color_hex else ""
+
+    user_prompt_block = f"""ПОЖЕЛАНИЕ ПОЛЬЗОВАТЕЛЯ (высокий приоритет, реализовать обязательно):
 {card_prompt}
 
 """ if card_prompt else ""
@@ -86,7 +95,7 @@ async def generate_card(
 
 {layout_desc}
 
-{user_prompt_block}ТЕКСТ НА КАРТОЧКЕ (использовать строго):
+{bg_color_block}{user_prompt_block}ТЕКСТ НА КАРТОЧКЕ (использовать строго):
 — {title_instruction}
 — {bottom_instruction}
 — НЕ добавлять название бренда

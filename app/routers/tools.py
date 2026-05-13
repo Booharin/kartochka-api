@@ -38,6 +38,8 @@ async def run_card_generation(
     title: str,
     bottom_text: str,
     card_prompt: str,
+    bg_color_hex: str,
+    bg_color_name: str,
     credits_left: int,
 ):
     admin = get_supabase_admin()
@@ -49,6 +51,8 @@ async def run_card_generation(
             title=title,
             bottom_text=bottom_text,
             card_prompt=card_prompt,
+            bg_color_hex=bg_color_hex,
+            bg_color_name=bg_color_name,
         )
 
         admin.table("generations").update({
@@ -155,7 +159,7 @@ async def suggest_benefits(
         )
         text = response.choices[0].message.content.strip()
         benefits = [line.strip() for line in text.split("\n") if line.strip()][:4]
-        return {"benefits": benefits}
+        return {"title": "", "benefits": benefits, "bottom_text": ""}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка анализа: {str(e)}")
 
@@ -246,6 +250,8 @@ async def create_card(
     title: str = Form(""),
     bottom_text: str = Form(""),
     card_prompt: str = Form(""),
+    bg_color_hex: str = Form(""),
+    bg_color_name: str = Form(""),
 ):
     token = authorization.replace("Bearer ", "")
     user_id = get_user_id(token)
@@ -294,6 +300,8 @@ async def create_card(
         title=title,
         bottom_text=bottom_text,
         card_prompt=card_prompt,
+        bg_color_hex=bg_color_hex,
+        bg_color_name=bg_color_name,
         credits_left=sub.data["credits_left"],
     )
 
