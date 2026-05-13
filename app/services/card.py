@@ -74,6 +74,11 @@ async def generate_card(
 — LEFT HALF: infographic benefits list
 — BOTTOM: accent banner"""
 
+    user_prompt_block = f"""ГЛАВНОЕ ПОЖЕЛАНИЕ ПОЛЬЗОВАТЕЛЯ (наивысший приоритет, реализовать обязательно):
+{card_prompt}
+
+""" if card_prompt else ""
+
     prompt = f"""Создай премиальную карточку товара для маркетплейса на основе загруженного фото товара.
 
 Главная задача:
@@ -81,7 +86,7 @@ async def generate_card(
 
 {layout_desc}
 
-ТЕКСТ НА КАРТОЧКЕ (использовать строго):
+{user_prompt_block}ТЕКСТ НА КАРТОЧКЕ (использовать строго):
 — {title_instruction}
 — {bottom_instruction}
 — НЕ добавлять название бренда
@@ -125,7 +130,7 @@ async def generate_card(
 Важно:
 — не делать дешёвый дизайн, не использовать кислотные цвета
 — не ломать форму товара
-— {card_prompt if card_prompt else "товар стоит на поверхности с тенью — не висит в воздухе"}
+— товар стоит на поверхности с тенью — не висит в воздухе
 — итог должен выглядеть как работа профессионального дизайнера"""
 
     response = await client.images.edit(
