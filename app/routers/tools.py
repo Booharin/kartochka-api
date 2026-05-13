@@ -37,6 +37,7 @@ async def run_card_generation(
     aspect_ratio: str,
     title: str,
     bottom_text: str,
+    card_prompt: str,
     credits_left: int,
 ):
     admin = get_supabase_admin()
@@ -47,6 +48,7 @@ async def run_card_generation(
             aspect_ratio=aspect_ratio,
             title=title,
             bottom_text=bottom_text,
+            card_prompt=card_prompt,
         )
 
         admin.table("generations").update({
@@ -243,6 +245,7 @@ async def create_card(
     aspect_ratio: str = Form("3:4"),
     title: str = Form(""),
     bottom_text: str = Form(""),
+    card_prompt: str = Form(""),
 ):
     token = authorization.replace("Bearer ", "")
     user_id = get_user_id(token)
@@ -290,6 +293,7 @@ async def create_card(
         aspect_ratio=aspect_ratio,
         title=title,
         bottom_text=bottom_text,
+        card_prompt=card_prompt,
         credits_left=sub.data["credits_left"],
     )
 

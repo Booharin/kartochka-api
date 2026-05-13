@@ -21,6 +21,7 @@ async def generate_card(
     aspect_ratio: str = "3:4",
     title: str = "",
     bottom_text: str = "",
+    card_prompt: str = "",
 ) -> str:
 
     async with httpx.AsyncClient() as http:
@@ -126,6 +127,9 @@ async def generate_card(
 — не ломать форму товара
 — товар стоит на поверхности с тенью — не висит в воздухе
 — итог должен выглядеть как работа профессионального дизайнера"""
+
+    if card_prompt:
+        prompt += f"\n\nДополнительные пожелания: {card_prompt}"
 
     response = await client.images.edit(
         model="gpt-image-1",
