@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Header, UploadFile, File, Form, BackgroundTasks
-from app.database import get_supabase, get_supabase_admin
+from app.database import get_supabase_admin
 from app.services.card import generate_card
+from app.auth import get_user_id
 from openai import AsyncOpenAI
 from app.config import settings
 from PIL import Image
@@ -18,15 +19,6 @@ router = APIRouter(prefix="/tools", tags=["tools"])
 
 API_BASE = "https://api.kartochka.top"
 
-
-def get_user_id(token: str) -> str:
-    from app.database import get_supabase
-    supabase = get_supabase()
-    try:
-        response = supabase.auth.get_user(token)
-        return response.user.id
-    except:
-        raise HTTPException(status_code=401, detail="Токен недействителен")
 
 
 async def run_card_generation(

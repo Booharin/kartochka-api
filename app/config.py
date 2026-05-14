@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     fal_key: str
     openai_api_key: str
     google_api_key: str = ""
+    supabase_jwt_secret: str = ""
 
     class Config:
         env_file = ".env"

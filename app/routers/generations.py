@@ -1,24 +1,18 @@
 from fastapi import APIRouter, HTTPException, Header, UploadFile, File, Form, BackgroundTasks
 from typing import Optional
-from app.database import get_supabase, get_supabase_admin
+from app.database import get_supabase_admin
 from app.services.generation import generate_product_shot, get_prompt_preview
+from app.auth import get_user_id
 import uuid
 import httpx
 import base64 as b64lib
+import time
 
 router = APIRouter(prefix="/generations", tags=["generations"])
 
 API_BASE = "https://api.kartochka.top"
 PAGE_SIZE = 20
 
-
-def get_user_id(token: str) -> str:
-    supabase = get_supabase()
-    try:
-        response = supabase.auth.get_user(token)
-        return response.user.id
-    except:
-        raise HTTPException(status_code=401, detail="Токен недействителен")
 
 
 async def save_result(
@@ -173,6 +167,7 @@ async def get_generations(
     user_id = get_user_id(token)
     admin = get_supabase_admin()
 
+    t0 = time.time()
     result = admin.table("generations")\
         .select("*")\
         .eq("user_id", user_id)\
@@ -180,6 +175,7 @@ async def get_generations(
         .limit(limit)\
         .offset(offset)\
         .execute()
+    print(f"[generations] query time: {time.time()-t0:.3f}s, rows: {len(result.data)}")
 
     return {
         "generations": result.data,
