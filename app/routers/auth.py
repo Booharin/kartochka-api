@@ -1,87 +1,86 @@
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
-from app.database import get_supabase, get_supabase_admin
+import bcrypt
+from app.database import get_pg
+from app.auth import create_access_token, create_refresh_token, verify_refresh_token, get_user_id
+import uuid
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+class LoginRequest(BaseModel):
+    email: str
+    password: str
 
 class RegisterRequest(BaseModel):
     email: str
     password: str
     full_name: str = ""
 
-class LoginRequest(BaseModel):
-    email: str
-    password: str
-
 class RefreshRequest(BaseModel):
     refresh_token: str
 
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode()[:72], bcrypt.gensalt()).decode()
+
+def verify_password(password: str, hashed: str) -> bool:
+    return bcrypt.checkpw(password.encode()[:72], hashed.encode())
 
 @router.post("/register")
-async def register(body: RegisterRequest):
-    supabase = get_supabase()
-    try:
-        response = supabase.auth.sign_up({
-            "email": body.email,
-            "password": body.password,
-            "options": {
-                "data": {"full_name": body.full_name}
-            }
-        })
-        return {"message": "Проверьте email для подтверждения", "user_id": response.user.id}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
+def register(body: RegisterRequest):
+    pg = get_pg()
+    cur = pg.cursor()
+    cur.execute("SELECT id FROM users WHERE email = %s", (body.email,))
+    if cur.fetchone():
+        raise HTTPException(status_code=400, detail="Email уже занят")
+    user_id = str(uuid.uuid4())
+    password_hash = hash_password(body.password)
+    cur.execute(
+        "INSERT INTO users (id, email, password_hash, full_name) VALUES (%s, %s, %s, %s)",
+        (user_id, body.email, password_hash, body.full_name)
+    )
+    cur.execute(
+        "INSERT INTO subscriptions (user_id, credits_left) VALUES (%s, %s)",
+        (user_id, 10)
+    )
+    return {"message": "Пользователь создан"}
 
 @router.post("/login")
-async def login(body: LoginRequest):
-    supabase = get_supabase()
-    try:
-        response = supabase.auth.sign_in_with_password({
-            "email": body.email,
-            "password": body.password
-        })
-        return {
-            "access_token": response.session.access_token,
-            "refresh_token": response.session.refresh_token,
-            "user_id": response.user.id
-        }
-    except Exception as e:
+def login(body: LoginRequest):
+    pg = get_pg()
+    cur = pg.cursor()
+    cur.execute("SELECT id, password_hash FROM users WHERE email = %s", (body.email,))
+    user = cur.fetchone()
+    if not user or not verify_password(body.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Неверный email или пароль")
-
+    return {
+        "access_token": create_access_token(user["id"]),
+        "refresh_token": create_refresh_token(user["id"]),
+        "user": {"id": user["id"]},
+    }
 
 @router.post("/refresh")
-async def refresh(body: RefreshRequest):
-    supabase = get_supabase()
-    try:
-        response = supabase.auth.refresh_session(body.refresh_token)
-        return {
-            "access_token": response.session.access_token,
-            "refresh_token": response.session.refresh_token,
-        }
-    except Exception as e:
-        raise HTTPException(status_code=401, detail="Refresh token недействителен")
-
+def refresh(body: RefreshRequest):
+    user_id = verify_refresh_token(body.refresh_token)
+    return {
+        "access_token": create_access_token(user_id),
+        "refresh_token": create_refresh_token(user_id),
+    }
 
 @router.get("/me")
-async def get_me(authorization: str = Header(...)):
+def me(authorization: str = Header(...)):
     token = authorization.replace("Bearer ", "")
-    supabase = get_supabase()
-    try:
-        response = supabase.auth.get_user(token)
-
-        admin = get_supabase_admin()
-        subscription = admin.table("subscriptions")\
-            .select("*")\
-            .eq("user_id", response.user.id)\
-            .single()\
-            .execute()
-
-        return {
-            "user_id": response.user.id,
-            "email": response.user.email,
-            "subscription": subscription.data
-        }
-    except Exception as e:
-        raise HTTPException(status_code=401, detail="Токен недействителен")
+    user_id = get_user_id(token)
+    pg = get_pg()
+    cur = pg.cursor()
+    cur.execute("SELECT id, email, full_name FROM users WHERE id = %s", (user_id,))
+    user = cur.fetchone()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    cur.execute("SELECT credits_left FROM subscriptions WHERE user_id = %s", (user_id,))
+    sub = cur.fetchone()
+    return {
+        "id": user["id"],
+        "email": user["email"],
+        "full_name": user["full_name"],
+        "credits_left": sub["credits_left"] if sub else 0,
+    }
