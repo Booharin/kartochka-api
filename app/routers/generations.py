@@ -7,6 +7,7 @@ import uuid
 import httpx
 import base64 as b64lib
 import time
+import asyncio
 
 router = APIRouter(prefix="/generations", tags=["generations"])
 
@@ -163,21 +164,23 @@ async def get_generations(
     limit: int = 20,
     offset: int = 0,
 ):
-    t0 = time.time()
     token = authorization.replace("Bearer ", "")
+    t0 = time.time()
     user_id = get_user_id(token)
     print(f"[generations] auth time: {time.time()-t0:.3f}s")
-
     admin = get_supabase_admin()
 
+    def do_query():
+        return admin.table("generations")\
+            .select("*")\
+            .eq("user_id", user_id)\
+            .order("created_at", desc=True)\
+            .limit(limit)\
+            .offset(offset)\
+            .execute()
+
     t1 = time.time()
-    result = admin.table("generations")\
-        .select("*")\
-        .eq("user_id", user_id)\
-        .order("created_at", desc=True)\
-        .limit(limit)\
-        .offset(offset)\
-        .execute()
+    result = await asyncio.get_event_loop().run_in_executor(None, do_query)
     print(f"[generations] query time: {time.time()-t1:.3f}s, rows: {len(result.data)}")
 
     return {
