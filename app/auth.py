@@ -1,28 +1,21 @@
 from fastapi import HTTPException
-from jose import jwt as jose_jwt, JWTError
-import httpx, json
+import httpx
+import jwt as pyjwt
+from jwt import PyJWKClient
 
 JWKS_URL = "https://jyalkrcrcxbcwiqehaae.supabase.co/auth/v1/.well-known/jwks"
-_jwks: dict | None = None
-
-
-def _load_jwks() -> dict:
-    global _jwks
-    if _jwks is None:
-        resp = httpx.get(JWKS_URL, timeout=10)
-        _jwks = resp.json()
-    return _jwks
+_jwks_client = PyJWKClient(JWKS_URL)
 
 
 def get_user_id(token: str) -> str:
     try:
-        jwks = _load_jwks()
-        payload = jose_jwt.decode(
+        signing_key = _jwks_client.get_signing_key_from_jwt(token)
+        payload = pyjwt.decode(
             token,
-            jwks,
+            signing_key.key,
             algorithms=["ES256"],
             audience="authenticated",
         )
         return payload["sub"]
-    except JWTError as e:
+    except Exception as e:
         raise HTTPException(status_code=401, detail="Токен недействителен")
