@@ -1,10 +1,19 @@
 from supabase import create_client, Client
 from app.config import settings
 
-# Клиент для операций от имени пользователя (с RLS)
-def get_supabase() -> Client:
-    return create_client(settings.supabase_url, settings.supabase_anon_key)
+_supabase: Client | None = None
+_supabase_admin: Client | None = None
 
-# Клиент для операций от имени сервера (обходит RLS)
+
+def get_supabase() -> Client:
+    global _supabase
+    if _supabase is None:
+        _supabase = create_client(settings.supabase_url, settings.supabase_anon_key)
+    return _supabase
+
+
 def get_supabase_admin() -> Client:
-    return create_client(settings.supabase_url, settings.supabase_service_key)
+    global _supabase_admin
+    if _supabase_admin is None:
+        _supabase_admin = create_client(settings.supabase_url, settings.supabase_service_key)
+    return _supabase_admin
