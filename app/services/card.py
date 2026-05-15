@@ -47,42 +47,44 @@ async def generate_card(
 
     title_instruction = f"Заголовок вверху карточки: «{title}»" if title else "заголовок карточки: НЕ добавлять, оставить без заголовка"
     bottom_instruction = f"Текст в нижнем баннере: «{bottom_text}»" if bottom_text else "нижний баннер: НЕ добавлять, оставить без баннера"
-    benefits_instruction = f"""3. Инфографика — блок СЛЕВА от товара
+
+    benefits_instruction = f"""3. Инфографика — размещение блоков вокруг товара
 — минималистичные иконки рядом с каждым преимуществом (круг с символом)
-— каждое преимущество на отдельной строке
-— распредели блоки инфографики равномерно вокруг товара
-— если товар круглый — блоки вокруг него по периметру
-— если товар вытянутый — блоки по обе стороны от него
-— текст блоков НЕ должен перекрываться с товаром, только на свободном пространстве фона
-— тонкие разделители между пунктами
+— ВАЖНО: определи форму товара и размести блоки соответственно:
+  • если товар круглый или компактный — распредели блоки равномерно вокруг товара по периметру (сверху-слева, снизу-слева, сверху-справа, снизу-справа)
+  • если товар вытянутый по вертикали — блоки слева и справа от товара на разных уровнях
+  • если товар вытянутый по горизонтали — блоки сверху и снизу от товара
+— каждый блок размещать отдельно, НЕ группировать все в одну колонку
+— текст блоков НЕ должен перекрываться с изображением товара
+— блоки только на свободном пространстве фона
 — современная типографика, mixed case (не ALL CAPS)
 — стиль: clean, minimal, premium, readable
 
-Преимущества товара (использовать точно этот текст):
+Преимущества товара (использовать ДОСЛОВНО, без изменений):
 {benefits_text}""" if benefits else "3. Инфографика — НЕ добавлять блок с преимуществами, оставить чистое пространство"
 
     if size_param == "1024x1536":
         layout_desc = """LAYOUT (vertical portrait):
 — TOP: large product headline, left-aligned or centered
-— CENTER-RIGHT: the product, large, dominant, on a podium or surface with shadow
-— LEFT SIDE: infographic block with benefits icons and text, vertically centered in the middle of the card
+— CENTER: the product, large, dominant, on a podium or surface with shadow
+— AROUND PRODUCT: infographic blocks distributed around the product (not all in one column)
 — BOTTOM: wide accent banner with key text"""
     elif size_param == "1536x1024":
         layout_desc = """LAYOUT (horizontal landscape):
-— LEFT HALF: large product headline at top, infographic benefits below
-— RIGHT HALF: the product, large, on a surface with shadow
+— LEFT: large product headline at top, infographic benefits distributed around product
+— RIGHT: the product, large, on a surface with shadow
 — BOTTOM: accent banner"""
     else:
         layout_desc = """LAYOUT (square):
 — TOP: large product headline
-— RIGHT HALF: the product, large, on a surface with shadow
-— LEFT HALF: infographic benefits list
+— CENTER: the product, large, on a surface with shadow
+— AROUND PRODUCT: infographic blocks distributed around the product
 — BOTTOM: accent banner"""
 
-    bg_color_block = f"""ЦВЕТ ФОНА (ОБЯЗАТЕЛЬНО, наивысший приоритет — игнорировать все остальные инструкции по цвету фона):
+    bg_color_block = f"""ЦВЕТ ФОНА (ОБЯЗАТЕЛЬНО, наивысший приоритет):
 — использовать СТРОГО этот цвет фона: {bg_color_name} ({bg_color_hex})
 — весь фон карточки должен быть именно этого цвета
-— не заменять другим цветом, не смешивать, не градиент если не просит пользователь
+— не заменять другим цветом, не смешивать, не градиент
 
 """ if bg_color_hex else ""
 
@@ -131,6 +133,10 @@ async def generate_card(
 — bold sans-serif шрифт
 — mixed case (не ALL CAPS) кроме нижнего баннера
 — современная визуальная иерархия
+— ЗАПРЕЩЕНЫ переносы слов (никаких дефисов в конце строки)
+— ЗАПРЕЩЕНЫ сокращения слов — писать каждое слово полностью
+— ЗАПРЕЩЕНЫ орфографические ошибки — проверить каждое слово
+— если слово не помещается — уменьшить шрифт, но не переносить и не сокращать
 
 5. Общий стиль
 — ultra realistic, premium ecommerce advertising
