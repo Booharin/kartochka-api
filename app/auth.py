@@ -1,5 +1,4 @@
 from fastapi import HTTPException
-import httpx
 import jwt as pyjwt
 from jwt import PyJWKClient
 
@@ -18,4 +17,5 @@ def get_user_id(token: str) -> str:
         )
         return payload["sub"]
     except Exception as e:
+        print(f"[auth] JWT error: {type(e).__name__}: {e}")
         raise HTTPException(status_code=401, detail="Токен недействителен")
