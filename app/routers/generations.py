@@ -163,11 +163,14 @@ async def get_generations(
     limit: int = 20,
     offset: int = 0,
 ):
+    t0 = time.time()
     token = authorization.replace("Bearer ", "")
     user_id = get_user_id(token)
+    print(f"[generations] auth time: {time.time()-t0:.3f}s")
+
     admin = get_supabase_admin()
 
-    t0 = time.time()
+    t1 = time.time()
     result = admin.table("generations")\
         .select("*")\
         .eq("user_id", user_id)\
@@ -175,7 +178,7 @@ async def get_generations(
         .limit(limit)\
         .offset(offset)\
         .execute()
-    print(f"[generations] query time: {time.time()-t0:.3f}s, rows: {len(result.data)}")
+    print(f"[generations] query time: {time.time()-t1:.3f}s, rows: {len(result.data)}")
 
     return {
         "generations": result.data,
