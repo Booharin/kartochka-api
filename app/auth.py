@@ -6,7 +6,9 @@ from app.config import settings
 JWKS_URL = "https://jyalkrcrcxbcwiqehaae.supabase.co/auth/v1/.well-known/jwks.json"
 _jwks_client = PyJWKClient(
     JWKS_URL,
-    headers={"apikey": settings.supabase_anon_key}
+    headers={"apikey": settings.supabase_anon_key},
+    lifespan=3600,
+    cache_keys=True,
 )
 
 
