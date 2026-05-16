@@ -19,6 +19,10 @@ class RegisterRequest(BaseModel):
 class RefreshRequest(BaseModel):
     refresh_token: str
 
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
+
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode()[:72], bcrypt.gensalt()).decode()
 
@@ -84,3 +88,21 @@ def me(authorization: str = Header(...)):
         "full_name": user["full_name"],
         "credits_left": sub["credits_left"] if sub else 0,
     }
+
+@router.post("/change-password")
+def change_password(body: ChangePasswordRequest, authorization: str = Header(...)):
+    token = authorization.replace("Bearer ", "")
+    user_id = get_user_id(token)
+    pg = get_pg()
+    cur = pg.cursor()
+    cur.execute("SELECT password_hash FROM users WHERE id = %s", (user_id,))
+    user = cur.fetchone()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    if not verify_password(body.old_password, user["password_hash"]):
+        raise HTTPException(status_code=400, detail="Неверный текущий пароль")
+    if len(body.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Новый пароль должен быть не менее 6 символов")
+    new_hash = hash_password(body.new_password)
+    cur.execute("UPDATE users SET password_hash = %s WHERE id = %s", (new_hash, user_id))
+    return {"message": "Пароль изменён"}
