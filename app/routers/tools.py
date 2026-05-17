@@ -75,11 +75,7 @@ async def run_card_generation(
 @router.post("/suggest-benefits")
 async def suggest_benefits(
     file: UploadFile = File(...),
-    authorization: str = Header(...),
 ):
-    token = authorization.replace("Bearer ", "")
-    get_user_id(token)
-
     file_content = await file.read()
     image_b64 = base64.b64encode(file_content).decode()
     mime_type = file.content_type or "image/jpeg"
